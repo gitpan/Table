@@ -1,1 +1,0 @@
-Table.o: Table.c

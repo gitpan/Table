@@ -1,337 +1,642 @@
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><title>BLT Table geometry manager</title></head><body>
-<h1>Table geometry manager</h1>
-<ul>
-<li><a href="#description">Description</a>
-<li><a href="#table">Creating a table</a>
-<li><a href="#cell">Creating a cell</a>
-<li><a href="#column">Columns and rows configuration</a>
-<li><a href="#other">Other commands</a>
-<li><a href="#bounding">Bounding list format</a>
-<li><a href="#example">Examples</a>
-</ul>
-<h2><a name="description">Description</a></h2>
+<HTML>
+<HEAD>
+<TITLE>Table - Data type related to database tables, spreadsheets, CSV files, HTML table displays, etc.</TITLE>
+<LINK REV="made" HREF="mailto:root@porky.devel.redhat.com">
+</HEAD>
 
- The blt_table command is a geometry manager for Tk.  It arranges
-windows tabularly.  The table consists of individual rows and columns
-whose spacing define its layout. Windows, called slaves, are
-positioned in the table by specifying the row and column.  Only one
-slave can be specified at a single position in the table.  But slaves
-may span multiple rows and columns.<p>
+<BODY>
 
- By default, blt_table tries to arrange all its slaves in the minimum
-space required. It determines this by querying each slave window for
-its requested size.  The maximum requested height all slaves spanning
-a particular row is the row's normal size.  Similarly, the maximum
-requested width of all slaves spanning a particular column is the
-column's normal size.  This, in turn, specifies the table's size,
-which is the sum of the normal sizes of the rows and columns.  The
-number of rows and columns a table contains is determined by the
-indices specified.<p>
+<!-- INDEX BEGIN -->
 
-<h2><a name="table">Creating a table</a></h2>
+<UL>
 
- Tables are created by invoking the blt_table command.
-<pre>
-	$table = $frame->Table(%options)
-</pre>
+	<LI><A HREF="#NAME">NAME</A>
+	<LI><A HREF="#SYNOPSIS">SYNOPSIS</A>
+	<LI><A HREF="#ABSTRACT">ABSTRACT</A>
+	<LI><A HREF="#INTRODUCTION">INTRODUCTION</A>
+	<LI><A HREF="#DESCRIPTION">DESCRIPTION</A>
+	<UL>
 
- $frame is the pathname of a window which must already exist.
-Blt_table will arrange its slave windows inside of $table.  Slave
-windows are added by designating the slave window's pathname and table
-position.<p>
+		<LI><A HREF="#Field_Summary">Field Summary</A>
+		<LI><A HREF="#Package_Variables">Package Variables</A>
+		<LI><A HREF="#Class_Methods">Class Methods</A>
+		<LI><A HREF="#Table_Creation">Table Creation</A>
+		<LI><A HREF="#Table_Access_and_Properties">Table Access and Properties</A>
+		<LI><A HREF="#Table_Formatting">Table Formatting</A>
+		<LI><A HREF="#Table_Operations">Table Operations</A>
+		<LI><A HREF="#Table_Table_Manipulations">Table-Table Manipulations</A>
+		<LI><A HREF="#Internal_Methods">Internal Methods</A>
+	</UL>
 
- The following arguments are available for the blt_table (all frame
-arguments are also available) :<p>
-<dl>
-   <dt>-height <dd>Specifies a desired window height that the table
-widget should request from its geometry manager.
+	<LI><A HREF="#INTERFACE_TO_OTHER_SOFTWARES">INTERFACE TO OTHER SOFTWARES</A>
+	<UL>
 
-   <dt>-width <dd> Specifies a desired window width that the table
-widget should request from its geometry manager.
+		<LI><A HREF="#Interface_to_Database_and_Web">Interface to Database and Web</A>
+		<LI><A HREF="#Interface_to_CSV">Interface to CSV</A>
+		<LI><A HREF="#Interface_to_Graphics_Package">Interface to Graphics Package</A>
+	</UL>
 
-   <dt>-row <dd> the rows of the table specified in argument will have the
-same heigth than the rows of the table.
+	<LI><A HREF="#AUTHOR">AUTHOR</A>
+	<LI><A HREF="#SEE_ALSO">SEE ALSO</A>
+</UL>
+<!-- INDEX END -->
 
-   <dt>-col <dd> the columns of the table specified in argument will have the
-same width than the columns of the table.
+<HR>
+<P>
+<H1><A NAME="NAME">NAME</A></H1>
+<P>
+Table - Data type related to database tables, spreadsheets, CSV files, HTML
+table displays, etc.
 
-    <dt>-xscrollincrement<dd>
-    <dt>-yscrollincrement<dd>
-    <dt>-xscrollcommand<dd>
-    <dt>-yscrollcommand<dd>
-</dl>
+<P>
+<HR>
+<H1><A NAME="SYNOPSIS">SYNOPSIS</A></H1>
+<P>
+<PRE>  # some cool ways to use Table.pm
+  use Table;
+  
+  $header = [&quot;name&quot;, &quot;age&quot;];
+  $data = [
+    [&quot;John&quot;, 20],
+    [&quot;Kate&quot;, 18],
+    [&quot;Mike&quot;, 23]
+  ]
+  $t = new Table($data, $header, 0);    # Construct a table object with
+                                        # $data, $header, $type=0 (consider 
+                                        # $data as the rows of the table).
+  print $t-&gt;csv;                        # Print out the table as a csv file.
+</PRE>
+<P>
+<PRE>  
+  $t = Table::fromCSV(&quot;aaa.csv&quot;);       # Read a csv file into a table oject
+  print $t-&gt;html;                       # Diplay a 'portrait' HTML TABLE on web. 
+</PRE>
+<P>
+<PRE>  use DBI;
+  $dbh= DBI-&gt;connect(&quot;DBI:mysql:test&quot;, &quot;test&quot;, &quot;&quot;) or die $dbh-&gt;errstr;
+  my $minAge = 10;
+  $t = Table::fromSQL($dbh, &quot;select * from mytable where age &gt;= ?&quot;, [$minAge]);
+                                        # Construct a table form an SQL 
+                                        # database query.
+</PRE>
+<P>
+<PRE>  $t-&gt;sort(&quot;age&quot;, 0, 0);                # Sort by col 'age',numerical,descending
+  print $t-&gt;html2;                      # Print out a 'landscape' HTML Table.  
+</PRE>
+<P>
+<PRE>  $row = $t-&gt;delRow(2);                 # Delete the third row (index=2).
+  $t-&gt;addRow($row, 4);                  # Add the deleted row back as fifth row. 
+  @rows = $t-&gt;delRows([0..2]);          # Delete three rows (row 0 to 2).
+  $col = $t-&gt;delCol(&quot;age&quot;);             # Delete column 'age'.
+  $t-&gt;addCol($col, &quot;age&quot;,2);            # Add column 'age' as the third column
+  @cols = $t-&gt;delCols([&quot;name&quot;,&quot;phone&quot;,&quot;ssn&quot;]); 
+                                        # Delete 3 columns at the same time. 
+</PRE>
+<P>
+<PRE>  $name =  $t-&gt;elm(2,&quot;name&quot;);           # Element access
+  $t2=$t-&gt;subTable([1, 3..4],['age', 'name']);  
+                                        # Extract a sub-table 
+</PRE>
+<P>
+<PRE>  $t-&gt;rename(&quot;Entry&quot;, &quot;New Entry&quot;);     # Rename column 'Entry' by 'New Entry'
+  $t-&gt;replace(&quot;Entry&quot;, [1..$t-&gt;nofRow()], &quot;New Entry&quot;); 
+                                        # Replace column 'Entry' by an array of
+                                        # numbers and rename it as 'New Entry'
+  $t-&gt;swap(&quot;age&quot;,&quot;ssn&quot;);                # Swap the positions of column 'age' 
+                                        # with column 'ssn' in the table.
+</PRE>
+<P>
+<PRE>  $t-&gt;colMap('name', sub {return uc});  # Map a function to a column 
+  $t-&gt;sort('age',0,0,'name',1,0);       # Sort table first by the numerical 
+                                        # column 'age' and then by the 
+                                        # string column 'name' in descending
+                                        # order
+  $t2=$t-&gt;match_pattern('$_-&gt;[0] =~ /^L/ &amp;&amp; $_-&gt;[3]&lt;0.2'); 
+                                        # Select the rows that matched the 
+                                        # pattern specified 
+  $t2=$t-&gt;match_string('John');         # Select the rows that matches 'John'   
+                                        # in any column
+</PRE>
+<P>
+<PRE>  $t2=$t-&gt;clone();                      # Make a copy of the table.
+  $t-&gt;rowMerge($t2);                    # Merge two tables
+  $t-&gt;colMerge($t2);
+</PRE>
+<P>
+<HR>
+<H1><A NAME="ABSTRACT">ABSTRACT</A></H1>
+<P>
+This perl package uses perl5 objects to make it easy for manipulating
+spreadsheet data among disk files, database, and Web publishing.
 
-<h2><a name="cell">Creating a cell</a></h2>
+<P>
+A table object contains a header and a two-dimensional array of scalars.
+Two class methods Table::fromCSV and Table::fromSQL allow users to create a
+table object from a CSV file or a database SQL selection in a snap.
 
-  The 2 possibilities are :
-<pre>
-($cell) = $table->Create($row, $column, 'name_of_Widget', %options);
-</pre>
-  or :
-<pre>
-$widget = $table->What_you_want;
-$table->put($row, $column, $widget);
-</pre>
-<h3>Cell configuration</h3> 
-<pre>
-   $table->Cell('configure', [$row, $column], %options);
-   $table->Cell('configure', $widget, %options);
-</pre>
- Possible options are :
-<dl>
- <dt>-anchor
-   <dd> Specifies how the slave window will be arranged if there is
-extra space in the span surrounding the window.  may have any of the
-forms accepted by Tk_GetAnchor.  For example, if is center then the
-window is centered in the rows and columns it spans; if is w then the
-window will be drawn such it touches the leftmost edge of the
-span. This option defaults to center.
+<P>
+Table methods provide basic access, add, delete <CODE>row(s)</CODE> or
+<CODE>column(s)</CODE> operations, as well as more advanced sub-table
+extraction, table sorting, record matching via keywords or patterns, table
+merging, and web publishing. Table class also provides a straightforward
+interface to other popular Perl modules such as DBI and GD::Graph.
 
- <dt>-columnspan 
-  <dd> Specifies the number of columns spanned by the slave. The
-default span is 1.
-
- <dt>-fill
-  <dd> Indicates if the slave should be expanded to occupy any extra
-space in the span.  must be one of the following: none, x, y, both.
-If is x, the width slave window is expanded.  If is y, the height is
-expanded. The default is none.
-
- <dt>-ipadx 
-   <dd> Specifies an extra padding in addition to the width requested
-by the slave window.  can be any value accepted by Tk_GetPixels.  The
-default is 0.
-
- <dt>-ipady 
-   <dd> Specifies an extra padding in addition to the height requested
-by the slave window.  can be any value accepted by Tk_GetPixels.  The
-default is 0.
-
- <dt>-padx 
-   <dd> Specifies an extra padding to the width of the span occupying
-the slave window.  can be any value accepted by Tk_GetPixels.  The
-default is 0.
-
- <dt>-pady 
-   <dd> Specifies an extra padding to the height of the span occupying
-the slave window.  can be any value accepted by Tk_GetPixels.  The
-default is 0.
-
- <dt>-reqheight 
-   <dd> Specifies limits for the requested height of the slave window.
-These limits also constrain the amount of internal padding given to
-the slave.  is a list of bounding values.  See the section <a
-href="#bounding">bounding list format</a> for a description of this
-list.  By default there are no constraints.
-
- <dt>-reqwidth 
-   <dd> Specifies the limits of the width which a slave may request.
-These limits also affect the amount of internal padding given to the
-slave.  is a list of bounding values.  See the section <a
-href="#bounding">bounding list format</a> for a description of this list.
-By default there are no constraints.
-
- <dt>-rowspan 
-   <dd> Specifies the number of rows spanned by the slave window. The
-default span is 1.
-</dl>
+<P>
+The current version of Table.pm is available at <A
+HREF="http://www.geocities.com/easydatabase">http://www.geocities.com/easydatabase</A>
 
 
-<h2><a name="column">Columns and rows configuration</a></h2>
+<P>
+<HR>
+<H1><A NAME="INTRODUCTION">INTRODUCTION</A></H1>
+<P>
+A table object has three data members:
 
-<pre>
-       $table->Row('configure', $row, %options);
-       $table->Columns('configure', $columns, %options);
-</pre>
+<OL>
+<LI><STRONG><A NAME="item__data_">$data:</A></STRONG>
+<P>
+a reference to an array of array-references. It's basically a reference to
+a two-dimensional array.
 
-Valid options are :
+<LI><STRONG><A NAME="item__header_">$header:</A></STRONG>
+<P>
+a reference to a string array. The array contains all the column names.
 
-<dl>
- <dt>-pady (row) -padx (column)
-   <dd> Specifies an extra padding to the normal width of the column.
-can be any value accepted by Tk_GetPixels.  The default padding is 0.
+<LI><STRONG><A NAME="item__type_1_or_0_">$type = 1 or 0.</A></STRONG>
+<P>
+1 means that <A HREF="#item__data">@$data</A> is an array of table columns
+(fields) (column-based); 0 means that <A HREF="#item__data">@$data</A> is
+an array of table rows (records) (row-based);
 
- <dt>-resize 
-  <dd> Indicates that the column can expand or shrink from its normal
-width when the table is resized.  must be one of the following: none,
-expand, shrink, or both.  If is expand the width of the column is
-expanded if there is extra space in the master window.  If is shrink
-its width may be reduced beyond its normal width if there is not
-enough space in the master.  The default is none.
+</OL>
+<P>
+Row-based/Column-based are two internal implementations for a table object.
+E.g., if a spreadsheet consists of two columns lastname and age. In a
+row-based table, <A HREF="#item__data">$data</A> = [ ['Smith', 29],
+['Dole', 32] ]. In a column-based table, <A HREF="#item__data">$data</A> =
+[ ['Smith', 'Dole'], [29, 32] ].
 
- <dt>-height (row) -width (column)
-  <dd> Specifies the limits within which the width of the column may
-expand or shrink.  is a list of bounding values.  See the section <a
-href="#bounding">bounding list format</a> for a description of this
-list.  By default there are no constraints.  </dl>
+<P>
+Two implementions have their pros and cons for different operations.
+Row-based implementation is better for sorting and pattern matching, while
+column-based one is better for adding/deleting/swapping columns.
 
-<h2><a name="other">Other commands</a></h2>
-<h3>Row and Column</h3>
-<ul>
-  <li>size :
-<pre>
-  $table->Row('sizes', $row);
-  $table->Column('sizes', $column);
-</pre>
+<P>
+Users only need to specify the implementation type of the table upon its
+creation via Table::new, and can forget about it afterwards. Implementation
+type of a table should be considered volital, because methods switch table
+objects from one type into another internally. Be advised that
+row/column/element references gained via table::rowRef, table::rowRefs,
+table::colRef, table::colRefs, or table::elmRef may become stale after
+other method calls afterwards.
 
- Returns the sizes of the given column (row) in the table.
-<p>
+<P>
+For those who want to inherit from the Table class, internal method
+table::rotate is used to switch from one implementation type into another.
+There is an additional internal assistant data structure called colHash in
+our current implementation. This hash table stores all column names and
+their corresponding column index number as key-value pairs for fast
+conversion. This gives users an option to use column name wherever a column
+ID is expected, so that user don't have to use table::colIndex all the
+time. E.g., you may say $t-&gt;rename('oldColName', 'newColName') instead
+of $t-&gt;rename($t-&gt;colIndex('oldColName'), 'newColIdx').
 
-  <li>forget :
-<pre>
-   $table->Cell('forget', [$row, $column]);
-   $table->Cell('forget', $widget);
-   $table->Row('forget', $row);
-   $table->Column('forget', $column);
-</pre>
+<P>
+<HR>
+<H1><A NAME="DESCRIPTION">DESCRIPTION</A></H1>
+<P>
+<HR>
+<H2><A NAME="Field_Summary">Field Summary</A></H2>
+<DL>
+<DT><STRONG><A NAME="item_data">data refto_arrayof_refto_array</A></STRONG><DD>
+<P>
+contains a two-dimensional spreadsheet data.
 
-    Requests that cell (row, column) no longer have its geometry
-managed. The window will be unmapped so that it no longer appears on
-the screen.  If slave is not currently managed by any table, an error
-message is returned, otherwise the empty string.<p>
-  <li> configure
-<pre>
-   $table->Cell('configure');
-   $table->Row('configure');
-   $table->Column('configure');
-</pre>
-</ul>
-<h3>Table</h3>
-<dl>
- <dt><tt>$table->get($row, $column);</tt>
-  <dd> return the slave in the
-cell ($row, $column).<p>  
- <dt><tt>$table->under($x, $y);</tt>
- <dd> return the slave located at $x, $y<p>
- <dt><tt>$table->dimension;</tt>
- <dd> return the number of rows and columns of
-the table.<p>
- <dt><tt>$table->location($pixel);</tt>
- <dd> return the row and column at $pixel<p>
- <dt><tt>$table->tablex($x);</tt>
- <dd> Given a screen x-coordinate <tt>$x</tt> this command returns the
-table x-coordinate that is displayed at that location.<p>
- <dt><tt>$table->tabley($y);</tt>
- <dd> Given a screen y-coordinate <tt>$y</tt> this command returns the
-table y-coordinate that is displayed at that location.<p>
- <dt><tt>$table->layout;</tt>
-  <dd> Forces layout of the table geometry manager. This is useful to get the
-geometry manager to calculate the normal width and height of each row and
+<DT><STRONG><A NAME="item_header">header refto_array</A></STRONG><DD>
+<P>
+contains all column names.
+
+<DT><STRONG><A NAME="item_type">type 0/1</A></STRONG><DD>
+<P>
+0 is row-based, 1 is column-based, describe the orientation of @$data.
+
+</DL>
+<P>
+<HR>
+<H2><A NAME="Package_Variables">Package Variables</A></H2>
+<DL>
+<DT><STRONG><A NAME="item__Table_VERSION">$Table::VERSION</A></STRONG><DD>
+<DT><STRONG><A NAME="item__Table_OK">@Table::OK</A></STRONG><DD>
+<P>
+see table::match_string and table::match_pattern
+
+<DT><STRONG><A NAME="item__Table_ID">$Table::ID</A></STRONG><DD>
+<P>
+see Table::fromSQL
+
+</DL>
+<P>
+<HR>
+<H2><A NAME="Class_Methods">Class Methods</A></H2>
+<P>
+Syntax: return_type method_name ( [ parameter [ = default_value ]] [,
+parameter [ = default_value ]] )
+
+<P>
+If method_name starts with table::, this is an instance method, it can be
+used as $t-&gt;method( parameters ), where <CODE>$t</CODE> is a table
+reference.
+
+<P>
+If method_name starts with Table::, this is a class method, it should be
+called as Table::method, e.g., <CODE>$t</CODE> =
+Table::fromCSV(``filename.csv'').
+
+<P>
+Convensions for local variables:
+
+<P>
+<PRE>  colID: either a numerical column index or a column name;
+  rowIdx: numerical row index;
+  rowIDsRef: reference to an array of column IDs;
+  rowIdcsRef: reference to an array of row indices;
+  rowRef, colRef: reference to an array of scalars;
+  data: ref_to_array_of_ref_to_array of data values;
+  header: ref to array of column headers;
+  table: a table object, a blessed reference.
+</PRE>
+<P>
+<HR>
+<H2><A NAME="Table_Creation">Table Creation</A></H2>
+<DL>
+<DT><STRONG><A NAME="item_table">table Table::new ( $data = [], $header = [], $type = 0, $enforceCheck = 1)</A></STRONG><DD>
+<P>
+create a new table. It returns a table object upon success, undef
+otherwise. $data: points to the spreadsheet data. $header: points to an
+array of column names. A column name must have at least one non-digit
+character. $type: 0 or 1 for row-based/column-based spreadsheet.
+$enforceCheck: 1/0 to turn on/off initial checking on the size of each
+row/column to make sure the data arguement indeed points to a valid
+structure.
+
+<DT><STRONG>table table::subTable ($rowIdcsRef, $colIDsRef)</STRONG><DD>
+<P>
+create a new table, which is a subset of the original. It returns a table
+object. $rowIdcsRef: points to an array of row indices. $colIDsRef: points
+to an array of column IDs. The function make a copy of selected elements
+from the original table. Undefined <CODE>$rowIdcsRef</CODE> or
+<CODE>$colIDsRef</CODE> is interrpreted as all rows or all columns.
+
+<DT><STRONG>table table::clone</STRONG><DD>
+<P>
+make a clone of the original. It return a table object, equivalent to
+table::subTable(undef,undef).
+
+<DT><STRONG>table Table::fromCSV ($name, $header = 1)</STRONG><DD>
+<P>
+create a table from a CSV file. return a table object. $name: the CSV file
+name. $header: 0 or 1 to ignore/interrpret the first line in the file as
+column names, If it is set to 0, the default column names are ``col1'',
+``col2'', ...
+
+<DT><STRONG>table Table::fromSQL ($dbh, $sql, $vars)</STRONG><DD>
+<P>
+create a table from the result of an SQL selection query. It returns a
+table object upon success or undef otherwise. Side effect: update
+$Table::ID. $dbh: a valid database handler. Typically <CODE>$dbh</CODE> is
+obtained from DBI-&gt;connect, see ``Interface to Database'' or DBI.pm.
+$sql: an SQL query string. $vars: optional reference to an array of
+variable values, required if <CODE>$sql</CODE> contains '?'s which need to
+be replaced by the corresponding variable values upon execution, see DBI.pm
+for details. If <CODE>$sql</CODE> is an INSERT and contain an
+auto-increment field, $Table::ID will contain the returned auto-increment
+value. Although we don't encourage using fromSQL for INSERT (it's not
+supposed to return a table), $Table::ID is supplied for completeness and
+the authors' laziness (using fromSQL for INSERT does save us the trouble of
+writing <CODE>prepare()</CODE> and <CODE>finish());</CODE> Hint: in MySQL,
+Table::fromSQL($dbh, 'show tables from test') will also create a valid
+table object.
+
+</DL>
+<P>
+<HR>
+<H2><A NAME="Table_Access_and_Properties">Table Access and Properties</A></H2>
+<DL>
+<DT><STRONG><A NAME="item_int">int table::colIndex ($colID)</A></STRONG><DD>
+<P>
+translate a column name into its numerical position, the first column has
+index 0 as in as any perl array. return -1 for invalid column names.
+
+<DT><STRONG>int table::nofCol</STRONG><DD>
+<P>
+return number of columns.
+
+<DT><STRONG>int table::nofRow</STRONG><DD>
+<P>
+return number of rows.
+
+<DT><STRONG><A NAME="item_scalar">scalar table::elm ($rowIdx, $colID)</A></STRONG><DD>
+<P>
+return the value of a table element at [$rowIdx, $colID], undef if
+<CODE>$rowIdx</CODE> or <CODE>$colID</CODE> is invalid. 
+
+<DT><STRONG><A NAME="item_refto_scalar">refto_scalar table::elmRef ($rowIdx, $colID)</A></STRONG><DD>
+<P>
+return the reference to a table element at [$rowIdx, $colID], to allow
+possible modification. It returns undef for invalid <CODE>$rowIdx</CODE> or
+$colID. 
+
+<DT><STRONG><A NAME="item_refto_array">refto_array table::header</A></STRONG><DD>
+<P>
+return an array of column names.
+
+<DT><STRONG>int table::type</STRONG><DD>
+<P>
+return the implementation type of the table (row-based/column-based) at the
+time, be aware that the type of a table should be considered as volital
+during method calls.
+
+</DL>
+<P>
+<HR>
+<H2><A NAME="Table_Formatting">Table Formatting</A></H2>
+<DL>
+<DT><STRONG><A NAME="item_string">string table::csv</A></STRONG><DD>
+<P>
+return a string corresponding to the CSV representation of the table.
+
+<DT><STRONG>string table::html ($colors = [&quot;#D4D4BF&quot;,&quot;#ECECE4&quot;,&quot;#CCCC99&quot;], 
+			  $specs = {'name' =&gt; '', 'border =&gt; '1', ...})</STRONG><DD>
+<P>
+return a string corresponding to a 'Portrait'-style html-tagged table.
+$colors: a reference to an array of three color strings, used for
+backgrounds for table header, odd-row records, and even-row records,
+respectively. A defaut color array (``#D4D4BF'',``#ECECE4'',``#CCCC99'')
+will be used if <CODE>$colors</CODE> isn't defined. $specs: a reference to
+a hash that specifies other attributes such as name, border, id, class,
+etc. for the TABLE tag. The table is shown in the ``Portrait'' style, like
+in Excel.
+
+<DT><STRONG>string table::html2 ($colors = [&quot;#D4D4BF&quot;,&quot;#ECECE4&quot;,&quot;#CCCC99&quot;],
+		 	   $specs = {'name' =&gt; '', 'border' =&gt; '1', ...})</STRONG><DD>
+<P>
+return a string corresponding to a ``Landscape'' html-tagged table. This is
+useful to present a table with many columns, but very few entries. Check
+the above table::html for parameter descriptions.
+
+</DL>
+<P>
+<HR>
+<H2><A NAME="Table_Operations">Table Operations</A></H2>
+<DL>
+<DT><STRONG>int table::setElm ($rowIdx, $colID, $val)</STRONG><DD>
+<P>
+modify the value of a table element at [$rowIdx, $colID] to a new value
+$val. It returns 1 upon success, undef otherwise. 
+
+<DT><STRONG>int table::addRow ( $rowRef, $rowIdx = table::nofRow)</STRONG><DD>
+<P>
+add a new row ($rowRef points to the actual list of scalars), the new row
+will be referred as <CODE>$rowIdx</CODE> as the result. E.g.,
+<CODE>addRow($aRow,</CODE> 0) will put the new row as the very first row.
+By default, it appends a row to the end. It returns 1 upon success, undef
+otherwise.
+
+<DT><STRONG>refto_array table::delRow ( $rowIdx )</STRONG><DD>
+<P>
+delete a row at $rowIdx. It will the reference to the deleted row.
+
+<DT><STRONG>refto_array table::delRows ( $rowIdcsRef )</STRONG><DD>
+<P>
+delete rows in @$rowIdcsRef. It will return an array of deleted rows upon
+success.
+
+<DT><STRONG>int table::addCol ($colRef, $colName, $colIdx = numCol)</STRONG><DD>
+<P>
+add a new column ($colRef points to the actual data), the new column will
+be referred as <CODE>$colName</CODE> or <CODE>$colIdx</CODE> as the result.
+E.g., <CODE>addCol($aCol,</CODE> 'newCol', 0) will put the new column as
+the very first column. By default, append a row to the end. It will return
+1 upon success or undef otherwise.
+
+<DT><STRONG>refto_array table::delCol ($colID)</STRONG><DD>
+<P>
+delete a column at <CODE>$colID</CODE> return the reference to the deleted
 column.
-</dl>
-<h2><a name="bounding">Bounding list format</a></h2>
 
- Constraints for various options (<tt>-reqheight, -reqwidth, -height,
-and -width</tt>) are specified by supplying a bounding list of values.
-Each value must be in a form accepted by Tk_GetPixels.  The
-interpretation of this list is based upon the number of values it
-contains:
-<dl>
- <dt><tt>[]</tt>
-  <dd>empty list. No bounding is performed.<p>
- <dt><tt>[ $x ]</tt>
-   <dd> Set the size of the window or partition at <tt>$x</tt>.  The
-size  of  the  partition  or window cannot grow or shrink.<p>
- <dt><tt>[ $min,  $max ]</tt>
-   <dd>Bound the size of the window or partition  between <tt>$min</tt>
-and <tt>$max</tt>.<p>
- <dt><tt>[ $min, $max, $nom ]</tt>
-   <dd>Bound the size of the window or partition  between
-<tt>$min</tt>  and <tt>$max</tt>.  In addition, set the normal size to
-<tt>$nom</tt>.
-</dl>
+<DT><STRONG><A NAME="item_arrayof_refto_array">arrayof_refto_array table::delCols ($colIDsRef)</A></STRONG><DD>
+<P>
+delete a list of columns, pointed by $colIDsRef. It will return an array of
+deleted columns upon success.
 
- The maximum bound max can also be specified as <tt>"Inf"</tt> to
-indicate a unlimited maximum bound.  This can be useful when you wish
-only to set the minimum or nominal size of a window or partition.
+<DT><STRONG>refto_array table::rowRef ($rowIdx)</STRONG><DD>
+<P>
+return a reference to the row at <CODE>$rowIdx</CODE> upon success or undef
+otherwise.
 
-<h2><a name="example">Examples</a></h2>
-<hr><hr>
-<pre>
-#!/usr/local/bin/perl
-use Tk;
-use Tk::BLT::Table;
-#
-$top = new MainWindow;
-$table = Table $top -border => 2, -relief => raised;
-Create $table 
-    0, 0, 'Button', -text => "But 1", -columnspan => 2, -fill => 'both',
-    0, 2, 'Button', -text => "But 2", -rspan => 2, -fill => 'both',
-    1, 0, 'Button', -text => "But 4", -rspan => 2, -fill => 'both',
-    2, 1, 'Button', -text => "But 3", -cspan => 2, -fill => 'both',
-    1, 1, 'Button', -text => "But 5", -fill => 'both';
-#
-$table->pack(-fill => 'both', -expand => 1);
-MainLoop;
-</pre>
-<hr>
-<img src="screenshot/table_1.gif" alt="Result of this script">
-<hr><hr>
-<pre>
-#!/usr/local/bin/perl
-use Tk;
-use Tk::BLT::Table;
-#
-%attribx = (-fill => 'x', -border => 1, -relief => 'sunken');
-#
-$top = new MainWindow;
-$table = Table $top -relief => 'ridge';
-configure $table -border => 5;
-#
-($tablet) = Create $table 0, 1, 'Table',-fill => 'x';
-Create $tablet 
-    0, 0, 'Label', -text => '1', %attribx,
-    0, 1, 'Label', -text => '2', %attribx;
-#
-($tables) = Create $table 2, 1, 'Table',-fill => 'x';
-Create $tables 
-    0, 0, 'Label', -text => '4', -fill => 'x', -border => 1, -relief => 'sunken',
-    0, 1, 'Label', -text => '3', -fill => 'x', -border => 1, -relief => 'sunken';
-#
-($table3, $scrollv1, $scrollv2) = Create $table 
-    1, 1, 'Table', -height => 200,
-    1, 0, 'Scrollbar', -orient => 'vertical', -fill => 'y',
-    1, 2, 'Scrollbar', -orient => 'vertical', -fill => 'y';
-configure $scrollv1 -command => ['yview', $table3];
-configure $scrollv2 -command => ['yview', $table3];
-configure $table3 
-    -yscrollcommand => sub { $scrollv1->set(@_); $scrollv2->set(@_); },
-    -col => [$tablet, $tables];
-#
-Create $table3 
-    0, 0, 'Text', -width => 6, -height => 8,
-    5, 1, 'Button', -text => "Button 3", -command => sub {$table3->under(50, 50);},
-    1, 0, 'Button', -text => "Button 4",
-    1, 1, 'Entry',
-    2, 0, 'Entry',
-    2, 1, 'Button', -text => "Button 5",
-    3, 0, 'Button', -text => "Button 6",
-    3, 1, 'Entry',
-    4, 0, 'Entry',
-    4, 1, 'Button', -text => "Button 7",
-    5, 0, 'Button', -text => "Button 8";
-#
-($table4) = Create $table3 0, 1, 'Table', -border => 2, -relief => 'groove';
-Create $table4 
-    1, 0, 'Button', -text => "Button 4",
-    1, 1, 'Entry',
-    2, 0, 'Entry',
-    2, 1, 'Button', -text => "Button 5",
-    3, 0, 'Button', -text => "Button 6",
-    3, 1, 'Entry',
-    4, 0, 'Entry';
-#
-$table->pack(-fill => 'both', -expand => 1);
-MainLoop;
-</pre>
-<hr>
-<img src="screenshot/table_2.gif" alt="Result of this script">
-<hr><hr>
-<address>
-<a href="http://moulon.inra.fr/ts.html">ts</a>
-</address>
-</body>
-</html>
+<DT><STRONG><A NAME="item_refto_arrayof_refto_array">refto_arrayof_refto_array table::rowRefs ($rowIdcsRef)</A></STRONG><DD>
+<P>
+return a reference to array of row references upon success, undef
+otherwise.
 
+<DT><STRONG><A NAME="item_array">array table::row ($rowIdx)</A></STRONG><DD>
+<P>
+return a copy of the row at <CODE>$rowIdx</CODE> upon success or undef
+otherwise.
 
+<DT><STRONG>refto_array table::colRef ($colID)</STRONG><DD>
+<P>
+return a reference to the column at <CODE>$colID</CODE> upon success.
+
+<DT><STRONG>refto_arrayof_refto_array table::colRefs ($colIDsRef)</STRONG><DD>
+<P>
+return a reference to array of column references upon success.
+
+<DT><STRONG>array table::col ($colID)</STRONG><DD>
+<P>
+return a copy to the column at <CODE>$colID</CODE> upon success or undef
+otherwise.
+
+<DT><STRONG>int table::rename ($colID, $newName)</STRONG><DD>
+<P>
+rename the column at <CODE>$colID</CODE> to a <CODE>$newName</CODE> (the
+newName must be valid, and should not be idential to any other existing
+column names). It returns 1 upon success or undef otherwise.
+
+<DT><STRONG>refto_array table::replace ($oldColID, $newColRef, $newName)</STRONG><DD>
+<P>
+replace the column at <CODE>$oldColID</CODE> by the array pointed by
+$newColRef, and renamed it to $newName. <CODE>$newName</CODE> is optional
+if you don't want to rename the column. It returns 1 upon success or undef
+otherwise.
+
+<DT><STRONG>int table::swap ($colID1, $colID2)</STRONG><DD>
+<P>
+swap two columns referred by <CODE>$colID1</CODE> and $colID2. It returns 1
+upon success or undef otherwise.
+
+<DT><STRONG>int table::colMap ($colID, $fun)</STRONG><DD>
+<P>
+foreach element in column $colID, map a function <CODE>$fun</CODE> to it.
+It returns 1 upon success or undef otherwise. This is a handy way to format
+a column. E.g. if a column named URL contains URL strings,
+<CODE>colMap(``URL'',</CODE> sub {``&lt;a href='$_'&gt;$_&lt;/a&gt;''})
+before <CODE>html()</CODE> will change each URL into a clickable hyper link
+while displayed in a web browser.
+
+<DT><STRONG>int table::sort($colID1, $type1, $order1, $colID2, $type2, $order2, ... )</STRONG><DD>
+<P>
+sort a table in place. First sort by column <CODE>$colID1</CODE> in
+<CODE>$order1</CODE> as $type1, then sort by <CODE>$colID2</CODE> in
+<CODE>$order2</CODE> as $type2, ... <A HREF="#item__type">$type</A> is 0
+for numerical and 1 for others; <CODE>$order</CODE> is 0 for ascending and
+1 for descending; Sorting is done in the priority of colID1, colID2, ... It
+returns 1 upon success or undef otherwise. Notice the table is rearranged
+as a result! This is different from perl's list sort, which returns a
+sorted copy while leave the original list untouched, the authors feel
+inplace sorting is more natural.
+
+<DT><STRONG>table table::match_pattern ($pattern)</STRONG><DD>
+<P>
+return a new table consisting those rows evaluated to be true by
+<CODE>$pattern</CODE> upon success or undef otherwise. Side effect:
+@Table::OK stores a true/false array for the original table rows. Using it,
+users can find out what are the rows being selected/unselected. In the
+<CODE>$pattern</CODE> string, a column element should be referred as
+$_-&gt;[$colIndex]. E.g., <CODE>match_pattern('$_-&gt;[0]&gt;3</CODE>
+&amp;&amp; $_-&gt;[1]=~/^L') retrieve all the rows where its first column
+is greater than 3 and second column starts with letter 'L'. Notice it only
+takes colIndex, column names are not acceptable here!
+
+<DT><STRONG>table table::match_string ($s)</STRONG><DD>
+<P>
+return a new table consisting those rows contains string <CODE>$s</CODE> in
+any of its fields upon success, undef otherwise. Side effect: @Table::OK
+stores a true/false array for the original table rows. Using it, users can
+find out what are the rows being selected/unselected. The <CODE>$s</CODE>
+string is actually treated as a regular expression and applied to each row
+element, therefore one can actually specify several keywords by saying, for
+instance, <CODE>match_string('One|Other').</CODE>
+
+</DL>
+<P>
+<HR>
+<H2><A NAME="Table_Table_Manipulations">Table-Table Manipulations</A></H2>
+<DL>
+<DT><STRONG>int table::rowMerge ($tbl)</STRONG><DD>
+<P>
+Append all the rows in the table object <CODE>$tbl</CODE> to the original
+rows. The merging table <CODE>$tbl</CODE> must have the same number of
+columns as the original. It returns 1 upon success, undef otherwise. The
+table object <CODE>$tbl</CODE> should not be used afterwards, since it
+becomes part of the new table.
+
+<DT><STRONG>int table::colMerge ($tbl)</STRONG><DD>
+<P>
+Append all the columns in table object <CODE>$tbl</CODE> to the original
+columns. Table <CODE>$tbl</CODE> must have the same number of rows as the
+original. It returns 1 upon success, undef otherwise. Table
+<CODE>$tbl</CODE> should not be used afterwards, since it becomes part of
+the new table.
+
+</DL>
+<P>
+<HR>
+<H2><A NAME="Internal_Methods">Internal Methods</A></H2>
+<P>
+All internal methods are mainly implemented for used by other methods in
+the Table class. Users should avoid using them. Nevertheless, they are
+listed here for developers who would like to understand the code and may
+derive a new class from Table.
+
+<DL>
+<DT><STRONG>int table::rotate</STRONG><DD>
+<P>
+convert the internal structure of a table between row-based and
+column-based. return 1 upon success, undef otherwise.
+
+<DT><STRONG>string csvEscape($rowRef)</STRONG><DD>
+<P>
+Encode an array of scalars into a CSV-formatted string.
+
+<DT><STRONG>refto_array parseCSV($string)</STRONG><DD>
+<P>
+Break a CSV encoded string to an array of scalars (check it out, we did it
+the cool way).
+
+</DL>
+<P>
+<HR>
+<H1><A NAME="INTERFACE_TO_OTHER_SOFTWARES">INTERFACE TO OTHER SOFTWARES</A></H1>
+<P>
+<PRE>  Spreadsheet is a very generic type, therefore Table class provides an easy
+  interface between databases, web pages, CSV files, graphics packages, etc.
+</PRE>
+<P>
+<PRE>  Here is a summary (partially repeat) of some classic usages of Table.
+</PRE>
+<P>
+<HR>
+<H2><A NAME="Interface_to_Database_and_Web">Interface to Database and Web</A></H2>
+<P>
+<PRE>  use DBI;
+</PRE>
+<P>
+<PRE>  $dbh= DBI-&gt;connect(&quot;DBI:mysql:test&quot;, &quot;test&quot;, &quot;&quot;) or die $dbh-&gt;errstr;
+  my $minAge = 10;
+  $t = Table::fromSQL($dbh, &quot;select * from mytable where age &gt;= ?&quot;, [$minAge]);
+  print $t-&gt;html;
+</PRE>
+<P>
+<HR>
+<H2><A NAME="Interface_to_CSV">Interface to CSV</A></H2>
+<P>
+<PRE>  $t = fromCSV(&quot;mydata.csv&quot;);
+  $t-&gt;sort(1,1,0);
+  print $t-&gt;csv;
+</PRE>
+<P>
+<HR>
+<H2><A NAME="Interface_to_Graphics_Package">Interface to Graphics Package</A></H2>
+<P>
+<PRE>  use GD::Graph::points;
+</PRE>
+<P>
+<PRE>  $graph = GD::Graph::points-&gt;new(400, 300);
+  $t2 = $t-&gt;match('$_-&gt;[1] &gt; 20 &amp;&amp; $_-&gt;[3] &lt; 35.7');
+  my $gd = $graph-&gt;plot($t-&gt;colRefs([0,2]));
+  open(IMG, '&gt;mygraph.png') or die $!;
+  binmode IMG;
+  print IMG $gd-&gt;png;
+  close IMG;
+</PRE>
+<P>
+<HR>
+<H1><A NAME="AUTHOR">AUTHOR</A></H1>
+<P>
+Copyright 1998-2000, Yingyao Zhou &amp; Guangzhou Zou. All rights reserved.
+
+<P>
+It was first written by Zhou in 1998, significantly improved and maintained
+by Zou since 1999. The authors thank Tong Peng and Yongchuang Tao for
+valuable suggestions.
+
+<P>
+This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+<P>
+Please send bug reports and comments to: <A
+HREF="mailto:easydatabase@yahoo.com.">easydatabase@yahoo.com.</A> When
+sending bug reports, please provide the version of Table.pm, the version of
+Perl.
+
+<P>
+<HR>
+<H1><A NAME="SEE_ALSO">SEE ALSO</A></H1>
+<P>
+<PRE>  DBI, GD::Graph.
+</PRE>
+</BODY>
+
+</HTML>
