@@ -28,14 +28,14 @@ COREXT int              Tk_TableCmd _ANSI_ARGS_((ClientData clientData,
  
 DECLARE_VTABLES;
  
-MODULE = Tk::Table       PACKAGE = Tk::Table
+MODULE = Tk::BLT::Table       PACKAGE = Tk::BLT::Table
  
 BOOT:
  {
   IMPORT_VTABLES;
 
   Lang_TkCommand("table",Tk_TableCmd);
-  EnterWidgetMethods("Table","create","tablex","tabley","Under","xview","yview","cell","row","column","forget","Get","layout",NULL);
+  EnterWidgetMethods("BLT::Table","create","tablex","tabley","Under","xview","yview","cell","row","column","forget","Get","layout",NULL);
 
  
  }

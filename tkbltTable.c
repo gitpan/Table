@@ -23,6 +23,7 @@
  * performance of this software.
  *
  * Table geometry manager created by George Howlett.
+ *
  */
 
 /*
@@ -51,11 +52,20 @@
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
-#include <X11/Xutil.h>
-#include <X11/Xatom.h>
 
 #ifndef TABLE_VERSION
 #define TABLE_VERSION "1.0"
+#endif
+
+/*
+ * Copy a string to dynamically allocated storage.
+ * Beware - evaluates argument twice!
+ */
+
+#ifdef TK_PORT_CURSES
+#   define Tk_BorderWidth(tkwin)	0
+#else
+#   define Tk_BorderWidth(tkwin)	Tk_Changes(tkwin)->border_width
 #endif
 
 #define TRUE 	1
@@ -520,6 +530,7 @@ static void TableEventProc _ANSI_ARGS_((ClientData clientData,
 static void InitPartitions _ANSI_ARGS_((Partition *partPtr, int length));
 static void LinkRowEntry _ANSI_ARGS_((Cubicle *cubiPtr));
 static void LinkColumnEntry _ANSI_ARGS_((Cubicle *cubiPtr));
+static int NumEntries _ANSI_ARGS_((Table *table, PartitionTypes type));
 
 extern int strcasecmp _ANSI_ARGS_((CONST char *s1, CONST char *s2));
 
@@ -867,7 +878,10 @@ PrintLeftTop(clientData, tkwin, widgRec, offset, freeProcPtr)
     int compte, i;
     Table **args;
 
-    if (tablePtr != NULL) {
+    if (tablePtr == NULL || *tablePtr == NULL) {
+	*freeProcPtr = (Tcl_FreeProc *) NULL;
+        LangSetDefault(&result,"");
+    } else {	
 	for (compte = 0, args = *tablePtr; *args; args++, compte++) ;
 	list = LangAllocVec(compte);
 	for (i = 0, args = *tablePtr; *args; args++, i++) {
@@ -1005,6 +1019,9 @@ TableEventProc(clientData, eventPtr)
 				 tablePtr->xOrigin + Tk_Width(tablePtr->tkwin),
 				 tablePtr->yOrigin + Tk_Height(tablePtr->tkwin));
     } else if (eventPtr->type == DestroyNotify) {
+	Blt_ListEntry *entryPtr;
+	Cubicle *cubiPtr;
+
 	if (tablePtr->tkwin != NULL) {
 #if 0
 	Tcl_DeleteHashEntry(Tcl_FindHashEntry(&masterWindows,
@@ -1013,11 +1030,19 @@ TableEventProc(clientData, eventPtr)
 	    tablePtr->tkwin = NULL;
 	    Lang_DeleteWidget(tablePtr->interp,tablePtr->widgetCmd);
 	}
+	for (entryPtr = Blt_FirstListEntry(tablePtr->listPtr);
+	    entryPtr != NULL; entryPtr = Blt_NextListEntry(entryPtr)) {
+	    cubiPtr = (Cubicle *)Blt_GetListValue(entryPtr);
+	    cubiPtr->rowEntryPtr = cubiPtr->colEntryPtr = NULL;
+	    DestroyCubicle(cubiPtr);
+	}
+	Blt_ClearList(&(tablePtr->rowSorted));
+	Blt_ClearList(&(tablePtr->colSorted));
+
 	if (tablePtr->flags & REDRAW_PENDING) {
 	    Tk_CancelIdleCall(ArrangeTable, (ClientData)tablePtr);
 	}
 	Tk_EventuallyFree((ClientData)tablePtr, DestroyTable);
-/* j'ai un destroy table apres */
     }
 }
 
@@ -1053,7 +1078,7 @@ SlaveEventProc(clientData, eventPtr)
     if (eventPtr->type == ConfigureNotify) {
 	int extBW;
 
-	extBW = Tk_Changes(cubiPtr->tkwin)->border_width;
+	extBW = Tk_BorderWidth(cubiPtr->tkwin);
 	cubiPtr->tablePtr->flags |= REQUEST_LAYOUT|RSLBL;
 	if (!(cubiPtr->tablePtr->flags & REDRAW_PENDING) &&
 	    (cubiPtr->extBW != extBW)) {
@@ -1121,20 +1146,15 @@ SlaveDelProc(clientData, tkwin)
 {
     Cubicle *cubiPtr = (Cubicle *)clientData;
 
-    if (Tk_IsMapped(cubiPtr->tkwin)) {
-	Tk_UnmapWindow(cubiPtr->tkwin);
+/*
+    if (cubiPtr->tablePtr->tkwin != Tk_Parent(tkwin)) {
+	Tk_UnmaintainGeometry(tkwin, cubiPtr->tablePtr->tkwin);
     }
-    cubiPtr->tablePtr->flags |= REQUEST_LAYOUT|RSLBL;
-    if (!(cubiPtr->tablePtr->flags & REDRAW_PENDING)) {
-	Tk_TableEventuallyRedraw((ClientData)cubiPtr->tablePtr,
-				 cubiPtr->tablePtr->xOrigin, cubiPtr->tablePtr->yOrigin,
-				 cubiPtr->tablePtr->xOrigin + Tk_Width(cubiPtr->tablePtr->tkwin),
-				 cubiPtr->tablePtr->yOrigin + Tk_Height(cubiPtr->tablePtr->tkwin));
-    }
+*/
     DestroyCubicle(cubiPtr);
 }
 
-static Tk_GeomMgr SlaveReq =  { "table", SlaveReqProc , SlaveDelProc };
+static Tk_GeomMgr SlaveReq =  { "blt::table", SlaveReqProc , SlaveDelProc };
 
 
 /*
@@ -1222,7 +1242,7 @@ CreateCubicle(tablePtr, tkwin)
 	    Tk_PathName(tablePtr->tkwin), "\"",          NULL);
 	return NULL;
     }
-    cubiPtr = (Cubicle *)malloc(sizeof(Cubicle));
+    cubiPtr = (Cubicle *)ckalloc(sizeof(Cubicle));
     if (cubiPtr == NULL) {
 	Tcl_SetResult(tablePtr->interp, "can't allocate cubicle",TCL_STATIC);
 	return NULL;
@@ -1235,7 +1255,7 @@ CreateCubicle(tablePtr, tkwin)
     cubiPtr->x = cubiPtr->y = cubiPtr->winwidth = cubiPtr->winheight = 0;
     cubiPtr->tkwin = tkwin;
     cubiPtr->tablePtr = tablePtr;
-    cubiPtr->extBW = Tk_Changes(tkwin)->border_width;
+    cubiPtr->extBW = Tk_BorderWidth(tkwin);
     cubiPtr->fill = DEF_FILL;
     cubiPtr->ipadX = DEF_IPAD_X;
     cubiPtr->ipadY = DEF_IPAD_Y;
@@ -1288,13 +1308,32 @@ DestroyCubicle(cubiPtr)
 	Blt_DeleteListEntry(&(cubiPtr->tablePtr->colSorted),
 	    cubiPtr->colEntryPtr);
     }
-    Tk_DeleteEventHandler(cubiPtr->tkwin, StructureNotifyMask,
-	SlaveEventProc, (ClientData)cubiPtr);
-    Tk_ManageGeometry(cubiPtr->tkwin, (Tk_GeomMgr *) NULL,
-	(ClientData)cubiPtr);
+
     entryPtr = Tcl_FindHashEntry(&slaveWindows, (char *)cubiPtr->tkwin);
     Tcl_DeleteHashEntry(entryPtr);
-    free((char *)cubiPtr);
+
+    Tk_DeleteEventHandler(cubiPtr->tkwin, StructureNotifyMask, SlaveEventProc,
+	    (ClientData)cubiPtr);
+    Tk_ManageGeometry(cubiPtr->tkwin, (Tk_GeomMgr *) NULL, (ClientData) NULL);
+    if (cubiPtr->tablePtr->tkwin != Tk_Parent(cubiPtr->tkwin)) {
+	Tk_UnmaintainGeometry(cubiPtr->tkwin, cubiPtr->tablePtr->tkwin);
+    }
+    Tk_UnmapWindow(cubiPtr->tkwin);
+
+    /*
+     * Arrange for table to be layed out.
+     */
+
+    if ((cubiPtr->tablePtr->tkwin != NULL) && 
+	Tk_IsMapped(cubiPtr->tablePtr->tkwin)) {
+	cubiPtr->tablePtr->flags |= REQUEST_LAYOUT|RSLBL;
+	if (!(cubiPtr->tablePtr->flags & REDRAW_PENDING)) {
+	    cubiPtr->tablePtr->flags |= REDRAW_PENDING;
+	    Tk_DoWhenIdle(ArrangeTable, (ClientData)cubiPtr->tablePtr);
+	}
+    }
+
+    ckfree((char *)cubiPtr);
 }
 
 /*
@@ -1506,6 +1545,7 @@ Tk_TableCmd(clientData, interp, argc, args)
 	int dummy;
 	Tcl_HashEntry *entryPtr;
 
+	memset((char *) tablePtr, 0, sizeof(Table));
 	tablePtr->tkwin = new;
 	tablePtr->searchWin = new;
 	tablePtr->display = Tk_Display(new);
@@ -1538,6 +1578,9 @@ Tk_TableCmd(clientData, interp, argc, args)
 	tablePtr->highlightBgColorPtr = NULL;
 	tablePtr->highlightColorPtr = NULL;
 	tablePtr->pixmapGC = None;
+	tablePtr->width = None;
+	tablePtr->height = None;
+	tablePtr->reqWidth = tablePtr->reqHeight = 1;
 	tablePtr->inset = 0;
 	tablePtr->confine = 1;
 	tablePtr->xOrigin = 0;
@@ -1550,7 +1593,7 @@ Tk_TableCmd(clientData, interp, argc, args)
 	Blt_InitLinkedList(&(tablePtr->colSorted), TCL_ONE_WORD_KEYS);
 	InitPartitions(tablePtr->colPtr, DEF_ARRAY_SIZE);
 
-	Tk_SetClass(tablePtr->tkwin, "Table");
+	Tk_SetClass(tablePtr->tkwin, "BLT::Table");
 	Tk_CreateEventHandler(tablePtr->tkwin, 
 			      StructureNotifyMask|VisibilityChangeMask,
 	    TableEventProc, (ClientData)tablePtr);
@@ -1588,27 +1631,16 @@ TableCmdDeletedProc(clientData)
     ClientData clientData;	/* Table structure */
 {
     register Table *tablePtr = (Table *)clientData;
-    Blt_ListEntry *entryPtr;
-    Cubicle *cubiPtr;
-    
-    for (entryPtr = Blt_FirstListEntry(tablePtr->listPtr);
-	entryPtr != NULL; entryPtr = Blt_NextListEntry(entryPtr)) {
-	cubiPtr = (Cubicle *)Blt_GetListValue(entryPtr);
-	cubiPtr->rowEntryPtr = cubiPtr->colEntryPtr = NULL;
-	DestroyCubicle(cubiPtr);
-    }
-    Blt_ClearList(&(tablePtr->rowSorted));
-    Blt_ClearList(&(tablePtr->colSorted));
 
     if ((tablePtr->rowPtr != NULL) &&
 	(tablePtr->rowPtr != tablePtr->rowSpace)) {
-	free((char *)tablePtr->rowPtr);
+	ckfree((char *)tablePtr->rowPtr);
     }
     if ((tablePtr->colPtr != NULL) &&
 	(tablePtr->colPtr != tablePtr->colSpace)) {
-	free((char *)tablePtr->colPtr);
+	ckfree((char *)tablePtr->colPtr);
     }
-    free((char *)tablePtr);
+    ckfree((char *)tablePtr);
 }
 
 /*
@@ -1666,7 +1698,7 @@ ExtendArray(partArr, oldSize, newSize)
 {
     Partition *newArr;
 
-    newArr = (Partition *)malloc(newSize * sizeof(Partition));
+    newArr = (Partition *)ckalloc(newSize * sizeof(Partition));
     if (newArr != NULL) {
 	if (oldSize > 0) {
 	    memcpy((char *)newArr, (char *)partArr,
@@ -1721,7 +1753,7 @@ AssertColumn(tablePtr, column)
 	    return 0;
 	}
 	if (tablePtr->colPtr != tablePtr->colSpace) {
-	    free((char *)tablePtr->colPtr);
+	    ckfree((char *)tablePtr->colPtr);
 	}
 	tablePtr->colPtr = newArr;
 	tablePtr->colSize = newSize;
@@ -1776,7 +1808,7 @@ AssertRow(tablePtr, row)
 	    return 0;
 	}
 	if (tablePtr->rowPtr != tablePtr->rowSpace) {
-	    free((char *)tablePtr->rowPtr);
+	    ckfree((char *)tablePtr->rowPtr);
 	}
 	tablePtr->rowPtr = newArr;
 	tablePtr->rowSize = newSize;
@@ -2041,6 +2073,15 @@ AddWindowToTable(tablePtr, tkwin, row, column, argc, args)
 	Blt_DeleteListEntry(&(tablePtr->rowSorted), cubiPtr->rowEntryPtr);
 	Blt_DeleteListEntry(&(tablePtr->colSorted), cubiPtr->colEntryPtr);
     } else {
+	if (cubiPtr != NULL) {
+/*
+	    if (cubiPtr->tablePtr != NULL
+		    && cubiPtr->tablePtr->tkwin != Tk_Parent(tkwin)) {
+		Tk_UnmaintainGeometry(tkwin, cubiPtr->tablePtr->tkwin);
+	    }
+*/
+	    DestroyCubicle(cubiPtr);
+	}
 	cubiPtr = CreateCubicle(tablePtr, tkwin);
 	if (cubiPtr == NULL) {
 	    return TCL_ERROR;
@@ -2056,9 +2097,11 @@ AddWindowToTable(tablePtr, tkwin, row, column, argc, args)
 	Cubicle *oldPtr;
 
 	oldPtr = (Cubicle *)Blt_GetListValue(entryPtr);
+/*
 	if (Tk_IsMapped(oldPtr->tkwin)) {
 	    Tk_UnmapWindow(oldPtr->tkwin);
 	}
+*/
 	DestroyCubicle(oldPtr);
     }
     cubiPtr->colIndex = column;
@@ -2217,10 +2260,10 @@ PartitionSizes(tablePtr, interp, type, indexStr)
     maxIndex = 0;		/* Suppress compiler warning */
     if ((numPartitions == 1) &&
 	(LangString(indexArr[0])[0] == 'a') && (strcmp(LangString(indexArr[0]), "all") == 0)) {
-	numPartitions = NUMENTRIES(tablePtr, type);
+	numPartitions = NumEntries(tablePtr, type);
 	queryAll = TRUE;
     } else {
-	maxIndex = NUMENTRIES(tablePtr, type);
+	maxIndex = NumEntries(tablePtr, type);
 	queryAll = FALSE;
     }
     partPtr = ((type == ROW_PARTITION_TYPE)
@@ -2294,7 +2337,7 @@ ConfigurePartition(tablePtr, interp, type, argc, args)
     partPtr = NULL;
     if ((numPartitions == 1) &&
 	(LangString(indexArr[0])[0] == 'a') && (strcmp(LangString(indexArr[0]), "all") == 0)) {
-	numPartitions = NUMENTRIES(tablePtr, type);
+	numPartitions = NumEntries(tablePtr, type);
 	configureAll = TRUE;
     }
     for (i = 0; i < numPartitions; i++) {
@@ -2395,24 +2438,12 @@ ForgetWindow(tablePtr, interp, argc, args)
 	    return TCL_ERROR;
 	}
 	cubiPtr = FindCubicle(interp, tkwin, TCL_LEAVE_ERR_MSG);
-	if (cubiPtr == NULL) {
-	    return TCL_ERROR;
+	if (cubiPtr != NULL) {
+	    if (cubiPtr->tablePtr->tkwin != Tk_Parent(tkwin)) {
+		Tk_UnmaintainGeometry(tkwin, cubiPtr->tablePtr->tkwin);
+	    }
+	    DestroyCubicle(cubiPtr);
 	}
-	if (Tk_IsMapped(cubiPtr->tkwin)) {
-	    Tk_UnmapWindow(cubiPtr->tkwin);
-	}
-	/*
-	 * Arrange for the call back here because not all the named
-	 * slave windows may belong to the same table.
-	 */
-	cubiPtr->tablePtr->flags |= REQUEST_LAYOUT|RSLBL;
-	if (!(cubiPtr->tablePtr->flags & REDRAW_PENDING)) {
-	    Tk_TableEventuallyRedraw((ClientData)cubiPtr->tablePtr,
-	    cubiPtr->tablePtr->xOrigin, cubiPtr->tablePtr->yOrigin,
-	    cubiPtr->tablePtr->xOrigin + Tk_Width(cubiPtr->tablePtr->tkwin),
-	    cubiPtr->tablePtr->yOrigin + Tk_Height(cubiPtr->tablePtr->tkwin));
-	}
-	DestroyCubicle(cubiPtr);
     }
     return TCL_OK;
 }
@@ -3189,9 +3220,10 @@ ArrangeCubicles(tablePtr)
 
 	if (((x + width) < 0) || ((y + height) < 0) || 
 	    (x >= screenX2) || (y >= screenY2)) {
-	    if (Tk_IsMapped(cubiPtr->tkwin)) {
-		Tk_UnmapWindow(cubiPtr->tkwin);
-	    }
+	    if (tablePtr->tkwin != Tk_Parent(cubiPtr->tkwin)) {
+		Tk_UnmaintainGeometry(cubiPtr->tkwin, tablePtr->tkwin);
+  	    }
+	    Tk_UnmapWindow(cubiPtr->tkwin);
 	    continue;
 	}
 
@@ -3229,9 +3261,10 @@ ArrangeCubicles(tablePtr)
 	 * only an external border) then unmap it.
 	 */
 	if ((winWidth < 1) || (winHeight < 1)) {
-	    if (Tk_IsMapped(cubiPtr->tkwin)) {
-		Tk_UnmapWindow(cubiPtr->tkwin);
-	    }
+	    if (tablePtr->tkwin != Tk_Parent(cubiPtr->tkwin)) {
+		Tk_UnmaintainGeometry(cubiPtr->tkwin, tablePtr->tkwin);
+  	    }
+	    Tk_UnmapWindow(cubiPtr->tkwin);
 	    continue;
 	}
 	deltaX = deltaY = 0;
@@ -3247,45 +3280,24 @@ ArrangeCubicles(tablePtr)
 	    newPt = TranslateAnchor(deltaX, deltaY, cubiPtr->anchor);
 	    x += newPt.x, y += newPt.y;
 	}
-	/*
-	 * Clip the slave window at the bottom and/or right edge of
-	 * the master
-	 */
-	if ((winWidth > (maxX - x)) && (tablePtr->impWidth == 0)) {
-	    winWidth = (maxX - x);
-	}
-	if (winHeight > (maxY - y) && (tablePtr->impHeight == 0)) {
-	    winHeight = (maxY - y);
-	}
-	/*
-	 * If the slave's parent window is not the master window,
-	 * translate the master window's x and y coordinates to the
-	 * coordinate system of the slave's parent.
-	 */
-
-	parent = Tk_Parent(cubiPtr->tkwin);
-	for (ancestor = tablePtr->tkwin; ancestor != parent;
-	    ancestor = Tk_Parent(ancestor)) {
-	    x += Tk_X(ancestor) + Tk_Changes(ancestor)->border_width;
-	    y += Tk_Y(ancestor) + Tk_Changes(ancestor)->border_width;
-	}
 
 	/*
 	 * Resize or move the window if necessary. Save the window's x
 	 * and y coordinates for reference next time.
 	 */
-	if ((x != cubiPtr->x) || (y != cubiPtr->y) ||
-	    (winWidth != Tk_Width(cubiPtr->tkwin)) ||
-	    (winHeight != Tk_Height(cubiPtr->tkwin))) {
-	    Tk_MoveResizeWindow(cubiPtr->tkwin, x, y, (unsigned int)winWidth,
-		(unsigned int)winHeight);
-	    cubiPtr->x = x, cubiPtr->y = y;
-	    cubiPtr->winwidth = winWidth, cubiPtr->winheight = winHeight;
-	    UpdateCall(cubiPtr);
-	}
-	if (!Tk_IsMapped(cubiPtr->tkwin)) {
-	    Tk_MapWindow(cubiPtr->tkwin);
-	}
+	if (tablePtr->tkwin == Tk_Parent(cubiPtr->tkwin)) {
+	    if ((x != cubiPtr->x) || (y != cubiPtr->y) ||
+		    (winWidth != Tk_Width(cubiPtr->tkwin)) ||
+		    (winHeight != Tk_Height(cubiPtr->tkwin))) {
+		Tk_MoveResizeWindow(cubiPtr->tkwin, x, y, winWidth, winHeight);
+	    }
+  	    Tk_MapWindow(cubiPtr->tkwin);
+	} else {
+	    Tk_MaintainGeometry(cubiPtr->tkwin, tablePtr->tkwin,
+		    x, y, winWidth, winHeight);
+  	}
+	cubiPtr->x = x;
+	cubiPtr->y = y;
     }
   borders:
     return;
@@ -3393,9 +3405,9 @@ ForceUnique(tablePtr, Top, type)
     if (Top != NULL) {
 	for (args = Top; *args; args++) {
 	    if ((*args)->tkwin != NULL) {
-		num = NUMENTRIES(tablePtr, type);
-		if (num > NUMENTRIES((*args), type)) {
-		    num = NUMENTRIES((*args), type);
+		num = NumEntries(tablePtr, type);
+		if (num > NumEntries((*args), type)) {
+		    num = NumEntries((*args), type);
 		}
 		partPtr = ((type == ROW_PARTITION_TYPE)? (*args)->rowPtr : (*args)->colPtr);
 		partTable = ((type == ROW_PARTITION_TYPE)? tablePtr->rowPtr : tablePtr->colPtr);
@@ -3460,7 +3472,6 @@ ArrangeTable(clientData)
      * is different, send a request to the master window's geometry
      * manager to resize.
      */
-
     if ((Tk_Width(tablePtr->tkwin) <= 2 * (tablePtr->inset + 1)) || 
 	(Tk_Height(tablePtr->tkwin) <= 2 * (tablePtr->inset + 1)) || 
 	(Tk_Width(tablePtr->tkwin) <= tablePtr->impWidth) || 
@@ -3656,6 +3667,62 @@ ArrangeTable(clientData)
 }
 
 /*
+ *----------------------------------------------------------------------
+ *
+ * LocationInfo --
+ *
+ *
+ *	Returns the row or column index given a pixel coordinate
+ *
+ * Results:
+ *	Returns a standard Tcl result.
+ *
+ * #ts: Stolen from SpecTcl
+ *
+ *----------------------------------------------------------------------
+ */
+/* ARGSUSED */
+static int
+LocationInfo(tablePtr, interp, type, indexStr)
+    Table *tablePtr;
+    Tcl_Interp *interp;
+    PartitionTypes type;
+    Arg *indexStr;
+{
+    long sum = 0;
+    long index;
+    Partition *partPtr;
+    Arg *indexArr;
+    int Location;
+    char string[20];
+    int numPartitions;
+    register int i;
+    LangFreeProc *freeProc = NULL;
+
+    if (Lang_SplitList(interp, indexStr, &Location, &indexArr, &freeProc) != TCL_OK) {
+	return TCL_ERROR;	/* Can't split list */
+    }
+    if (sscanf(LangString(indexArr[0]), "%ld", &index) != 1) {
+	return TCL_ERROR;
+    }
+    if (index < 0) {
+	sprintf(string, "%d",-1);
+	Tcl_AppendElement(tablePtr->interp, string);
+	return TCL_OK;
+    }
+    numPartitions = NumEntries(tablePtr, type);
+    partPtr = ((type == ROW_PARTITION_TYPE)
+	? tablePtr->rowPtr : tablePtr->colPtr);
+    for (i = 0; i < numPartitions; i++) {
+	sum += partPtr[i].size;
+	if (index < sum) break;
+    }
+    sprintf(string, "%d",i);
+    Tcl_AppendElement(tablePtr->interp, string);
+    return TCL_OK;
+}
+
+/*
  *--------------------------------------------------------------
  *
  * PartitionCmd --
@@ -3707,7 +3774,7 @@ PartitionCmd(tablePtr, interp, type, argc, args)
 		" master ", partClass, " dimension",          NULL);
 	    return TCL_ERROR;
 	}
-	Tcl_IntResults(interp,1,0, NUMENTRIES(tablePtr, type));
+	Tcl_IntResults(interp,1,0, NumEntries(tablePtr, type));
 	result = TCL_OK;
     } else if ((c == 's') && (strncmp(LangString(args[2]), "sizes", length) == 0)) {
 	if (argc != 4) {
@@ -3716,9 +3783,17 @@ PartitionCmd(tablePtr, interp, type, argc, args)
 	    return TCL_ERROR;
 	}
 	result = PartitionSizes(tablePtr, interp, type, args[3]);
+    } else if ((c == 'l') && (strncmp(LangString(args[2]), "location", length) == 0)) {    
+
+	if (argc != 4) {
+	    Tcl_AppendResult(interp, "wrong # args: should be \"", LangString(args[0]),
+		" master ", partClass, " location coord", (char *)NULL);
+	    return TCL_ERROR;
+	}
+	result = LocationInfo(tablePtr, interp, type, args[3]);
     } else {
 	Tcl_AppendResult(interp, "unknown ", partClass, " option \"", LangString(args[3]),
-	    "\": should be configure, dimension, or sizes",
+	    "\": should be configure, dimension, location, or sizes",
 	             NULL);
     }
     return result;
@@ -4299,4 +4374,45 @@ TableWidgetCmd(clientData, interp, argc, args)
     Tcl_AppendResult(interp, "unknown option \"", LangString(args[1]), "\": should be\
  configure, column, forget, masters, row, or slaves",          NULL);
     return TCL_ERROR;
+}
+
+/* find the maximum *used* row or column entry in a table 
+ * SAU
+ * This is probably wrong, but its better that what was there
+ * before
+ */
+
+static int
+NumEntries (tablePtr, type)
+    Table *tablePtr;
+    PartitionTypes type;
+{
+    int max = 0;
+    int last;
+    Blt_ListEntry *entryPtr;
+    Blt_LinkedList *listPtr;
+    Cubicle *cubiPtr;
+
+	if (type == ROW_PARTITION_TYPE) {
+		listPtr = &(tablePtr->rowSorted);
+	} else {
+		listPtr = &(tablePtr->colSorted);
+	}
+    for (entryPtr = Blt_FirstListEntry(listPtr);
+		    entryPtr != NULL; entryPtr = Blt_NextListEntry(entryPtr)) {
+	cubiPtr = (Cubicle *)Blt_GetListValue(entryPtr);
+	if (type == ROW_PARTITION_TYPE) {
+	    last = cubiPtr->rowSpan + cubiPtr->rowIndex;
+	} else {
+	    last = cubiPtr->colSpan + cubiPtr->colIndex;
+	}
+/*
+	fprintf(stderr," %d,%d (%d %d) <%d <= %d>\n",
+		cubiPtr->rowIndex, cubiPtr->colIndex,
+		cubiPtr->rowSpan, cubiPtr->colSpan,
+		max,last);
+*/
+	if (last > max) max = last;
+	}
+    return(max);
 }

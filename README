@@ -1,3 +1,8 @@
+
+ ------------------------------------------------------------
+ * 3/11/95 : Add patch from Martin Andrews <andrewm@ccfadm.eeg.ccf.org>
+ ------------------------------------------------------------
+
 This is version 1.8 of the BLT library.  It is an extension to 
 Tk toolkit (it requires no patching of the Tcl or Tk libraries).  
 

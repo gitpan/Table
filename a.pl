@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 BEGIN { unshift (@INC,qw(./blib .)) }
 use Tk;
-use Tk::Table;
+use Tk::BLT::Table;
 #
 %attribx = (-fill => 'x', -border => 1, -relief => 'sunken');
 #
@@ -20,28 +20,29 @@ Create $table
     2, 2, 'Entry';
 #
 Cell $table 'configure',[1, 2], -anchor => "se";
-# $table->Row('forget', 0);
-# $table->Column('forget', 1);
-# $table->Column('configure', 1);
+# @a = $table->Column('forget', 1);
+# @a = $table->Column('configure', 1);
 #
-$table1 = Create $table 
+($table1) = Create $table 
     1, 0, 'Table', -anchor => 'nw',-border => 5, -relief => 'raised';
 Create $table1
     0, 0, 'Button', -text => "But 1", -columnspan => 2, -fill => 'both',
-    0, 2, 'Button', -text => "But 2", -rspan => 2, -fill => 'both',
+    0, 2, 'Button', -text => "But 2", -rspan => 2, -fill => 'both', -command => \&foo,
     1, 0, 'Button', -text => "But 4", -rspan => 2, -fill => 'both',
     2, 1, 'Button', -text => "But 3", -cspan => 2, -fill => 'both',
     1, 1, 'Button', -text => "But 5", -fill => 'both';
 #
-$table0 = Create $table 
+# $table->Row('forget', 0);
+# $table->Column('forget', 0);
+($table0) = Create $table 
     1, 1, 'Table', -border => 10, -relief => 'sunken', -fill => 'both';
 #
-$tablet = Create $table0 0, 1, 'Table',-fill => 'x';
+($tablet) = Create $table0 0, 1, 'Table',-fill => 'x';
 Create $tablet 
     0, 0, 'Label', -text => '1', %attribx,
     0, 1, 'Label', -text => '2', %attribx;
 #
-$tables = Create $table0 2, 1, 'Table',-fill => 'x';
+($tables) = Create $table0 2, 1, 'Table',-fill => 'x';
 Create $tables 
     0, 0, 'Label', -text => '4', -fill => 'x', -border => 1, -relief => 'sunken',
     0, 1, 'Label', -text => '3', -fill => 'x', -border => 1, -relief => 'sunken';
@@ -69,7 +70,7 @@ Create $table3
     4, 1, 'Button', -text => "Button 7",
     5, 0, 'Button', -text => "Button 8";
 #
-$table4 = Create $table3 0, 1, 'Table', -border => 2, -relief => 'groove';
+($table4) = Create $table3 0, 1, 'Table', -border => 2, -relief => 'groove';
 Create $table4 
     1, 0, 'Button', -text => "Button 4",
     1, 1, 'Entry',
@@ -86,8 +87,26 @@ MainLoop;
 sub foo {
     @dim =  $table->dimension;
     $, = ' ';
+    print "Location : ",$table->Row('location', 12),"\n";
+    print "Location : ",$table->Row('location', 120),"\n";
+    print "@dim\n";
     for($i=0; $i<$dim[0];$i++) {
 	print "$i : ",$table->Row('size', $i)," ",
-	$table->Column('size',$i),"\n";
     }
+    print "\n";
+    for($i=0; $i<$dim[1];$i++) {
+	print "$i : ",$table->Column('size',$i)," ";
+    }
+    print "\n";
+    @dim =  $table->dimension;
+    $, = ' ';
+    print "@dim\n";
+    for($i=0; $i<$dim[0];$i++) {
+	print "$i : ",$table->Row('size', $i)," ",
+    }
+    print "\n";
+    for($i=0; $i<$dim[1];$i++) {
+	print "$i : ",$table->Column('size',$i)," ";
+    }
+    print "\n";
 }

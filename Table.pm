@@ -1,4 +1,4 @@
-package Tk::Table; 
+package Tk::BLT::Table; 
 require DynaLoader;
 require Tk::Widget;
 use AutoLoader;
@@ -8,7 +8,7 @@ use Carp;
  
 Tk::Widget->Construct('Table');
  
-bootstrap Tk::Table;
+bootstrap Tk::BLT::Table;
  
 sub Tk_cmd { \&Tk::table }
 
@@ -66,7 +66,7 @@ sub CREATE {
 	croak "Invalid row" if $row < 0;
 	croak "Invalid column" if !defined $col || $col < 0;
 	croak "Invalid widget" if !defined $entry;
-	if (defined ref $entry) {
+	if (ref $entry) {
 	    croak "Table is not the parent of widget" 
 		if $entry->parent ne $table;
 	    $t_arg = $args if defined $args;
@@ -89,7 +89,7 @@ sub CREATE {
 	$table->{'_matrice_'}[$row][$col] = $entry;
 	push(@result, $entry);
     }
-    return ($#result==0)?$result[0]:@result;
+    return @result;
 }
 
 *Create = \&CREATE;
@@ -155,6 +155,11 @@ sub Forget {
 sub dimension {
     my $table = shift;
     return ($table->Row('dimension'), $table->Column('dimension'));
+}
+
+sub location {
+    my($table, $pos) = @_;
+    return ($table->Row('location', $pos), $table->Column('location', $pos));
 }
 
 sub under {
