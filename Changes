@@ -1,4 +1,8 @@
 Revision history for Perl extension Table.
 
+1.16  Fri Sep 29 22:18:06 PDT 2000
+  Slight modifications to make Table identical to Data::Table;
+  Due to name collision with PerlQt
+
 1.15  Tue Sep 26 18:32:52 PDT 2000
   first official release version

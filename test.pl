@@ -218,17 +218,17 @@ if ($t->colMerge($t2) && $t->nofCol()==7) {
 $t->delCol('new column');
 $t->sort('Entry',1,0);
 
-# use DBI;
-# $dbh= DBI->connect("DBI:mysql:test", "test", "") or die $dbh->errstr;
-# $t = Table::fromSQL($dbh, "show tables");
-# print $t->csv;
-
 $t2=Table::fromCSV('aaa.csv');
 if (equal($t->rowRefs(), $t2->rowRefs())) {
   print "ok 38 overall\n";
 } else {
   print "not ok 38 overall\n";
 }
+
+# use DBI;
+# $dbh= DBI->connect("DBI:mysql:test", "test", "") or die $dbh->errstr;
+# $t = Table::fromSQL($dbh, "show tables");
+# print $t->csv;
 
 # @_ in match_
 package FOO; @ISA = qw(Table);

@@ -1,6 +1,19 @@
 package Table;
 
-$VERSION = 1.15;
+use strict;
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
+
+require Exporter;
+require AutoLoader;
+
+@ISA = qw(Exporter AutoLoader);
+# Items to export into callers namespace by default. Note: do not export
+# names by default without a very good reason. Use EXPORT_OK instead.
+# Do not simply export all your public functions/methods/constants.
+@EXPORT = qw(
+	
+);
+$VERSION = '1.16';
 
 sub new {
   my ($class, $data, $header, $type, $enforceCheck) = @_;
@@ -20,7 +33,7 @@ sub new {
     $colHash->{$elm} = $i;
   }
   if ($enforceCheck && scalar @$data > 0) {
-    $size=scalar @{$data->[0]};
+    my $size=scalar @{$data->[0]};
     for (my $j =1; $j<scalar @$data; $j++) {
       die "Inconsistant array size at data[$j]" unless (scalar @{$data->[$j]} == $size);
     }
@@ -71,7 +84,7 @@ sub csv {
   if ($self->{data}) {
     $self->rotate() if ($self->{type});
     my $data=$self->{data};
-    for ($i=0; $i<=$#{$data}; $i++) {
+    for (my $i=0; $i<=$#{$data}; $i++) {
       $s .= join(",", map {csvEscape($_)} @{$data->[$i]}) . "\n";
     }
   }
@@ -83,13 +96,13 @@ sub html {
   my ($self, $colors, $specs) = @_;
   my %sp = ();
   my $s = "";
-  if (ref $specs eq HASH) {
+  if (ref $specs eq 'HASH') {
 	%sp = %$specs;
   } else {
 	$sp{BORDER} = 1;
   } 
   $s = "<TABLE ";
-  foreach $key (keys %sp) {
+  foreach my $key (keys %sp) {
 	$s .= "$key=$sp{$key} ";
   }
   $s .= ">\n";
@@ -102,7 +115,7 @@ sub html {
   my $data=$self->{data};
   for (my $i=0; $i<=$#{$data}; $i++) {
     $s .= "<TR BGCOLOR=\"" . $BG_COLOR[$i%2] . "\">";
-    for ($j=0; $j<=$#{$header}; $j++) {
+    for (my $j=0; $j<=$#{$header}; $j++) {
       $s .= "<TD>";
       $s .= ($data->[$i][$j])?$data->[$i][$j]:"&nbsp;";
       $s .= "</TD>";
@@ -126,7 +139,7 @@ sub html2 {
         $sp{'BORDER'} = 1;
   }
   $s = "<TABLE ";
-  foreach $key (keys %sp) {
+  foreach my $key (keys %sp) {
         $s .= "$key=$sp{$key} ";
   }
   $s .= ">\n";
@@ -138,7 +151,7 @@ sub html2 {
   for (my $i = 0; $i <= $#{$header}; $i++) {
     $s .= "<TR><TH BGCOLOR=\"" . $BG_COLOR[2] . "\">" .
           $header->[$i] . "</TD>";
-    for ($j=0; $j<=$#{$data->[0]}; $j++) {
+    for (my $j=0; $j<=$#{$data->[0]}; $j++) {
       $s .= "<TD BGCOLOR=" . $BG_COLOR[$j%2] . ">";
       $s .= ($data->[$i][$j])?$data->[$i][$j]:'&nbsp;';
       $s .= "</TD>";
@@ -265,7 +278,7 @@ sub delCols {
   @indices = sort { $b <=> $a } @indices;
 
   my @dels=();
-  foreach $colIdx (@indices) {
+  foreach my $colIdx (@indices) {
     push @dels, $self->delCol($colIdx);
   }
   return @dels;
@@ -496,8 +509,8 @@ sub rotate {
   my $newdata=[];
   my $data=$self->{data};
   $self->{type} = ($self->{type})?0:1;
-  for ($i=$#{$data->[0]}; $i>=0; $i--) {
-    for ($j=$#{$data}; $j>=0;  $j--) {
+  for (my $i=$#{$data->[0]}; $i>=0; $i--) {
+    for (my $j=$#{$data}; $j>=0;  $j--) {
       $newdata->[$i][$j]=$data->[$j][$i];
     }
   }
@@ -562,9 +575,9 @@ sub match_pattern {
   my ($self, $pattern) = @_;
   my @data=();
   $self->rotate() if $self->{type};
-  @OK= eval "map {$pattern} \@{\$self->{data}};";
+  @Table::OK= eval "map {$pattern} \@{\$self->{data}};";
   for (my $i=0; $i<$self->nofRow(); $i++) {
-    push @data, $self->{data}->[$i] if $OK[$i];
+    push @data, $self->{data}->[$i] if $Table::OK[$i];
   }
   return new Table(\@data, \@{$self->{header}}, 0);
 }
@@ -576,13 +589,13 @@ sub match_string {
   die unless defined($s);
   my @data=();
   $self->rotate() if $self->{type};
-  @OK=();
-  foreach $row_ref (@{$self->data}) {
-    push @OK, undef;
-    foreach $elm (@$row_ref) {
+  @Table::OK=();
+  foreach my $row_ref (@{$self->data}) {
+    push @Table::OK, undef;
+    foreach my $elm (@$row_ref) {
 	if ($elm =~ /$s/o) {
 		push @data, $row_ref;
-		$OK[$#OK]=1;
+		$Table::OK[$#Table::OK]=1;
 		last;
    	}
     }
@@ -743,9 +756,9 @@ sub fromSQL {
   $sth = $dbh->prepare($sql) or die "Preparing: , ".$sth->errstr;
   my @vars=() unless defined $vars;
   $sth->execute(@vars) or die "Executing: , ".$sth->errstr;
-  $ID = undef;
-  $ID = $sth->{'mysql_insertid'};
-  if (!$sth->{NUM_OF_FIELDS} ) {
+#  $Table::ID = undef;
+#  $Table::ID = $sth->{'mysql_insertid'};
+  if ($sth->{NUM_OF_FIELDS}) {
     $header=$sth->{'NAME'};
     $t = new Table($sth->fetchall_arrayref(), $header, 0);
   } else {
@@ -850,6 +863,8 @@ popular Perl modules such as DBI and GD::Graph.
 
 The current version of Table.pm is available at http://www.geocities.com/easydatabase
 
+We use Table instead of Table, because Table.pm has already been used inside PerlQt module in CPAN.
+
 =head1 INTRODUCTION
 
 =over 4
@@ -930,9 +945,9 @@ contains all column names.
 
 see table::match_string and table::match_pattern
 
-=item $Table::ID
-
-see Table::fromSQL
+# =item $Table::ID
+# 
+#see Table::fromSQL
 
 =back
 
@@ -995,19 +1010,13 @@ If it is set to 0, the default column names are "col1", "col2", ...
 
 create a table from the result of an SQL selection query.
 It returns a table object upon success or undef otherwise.
-Side effect: update $Table::ID.
 $dbh: a valid database handler. 
 Typically $dbh is obtained from DBI->connect, see "Interface to Database" or DBI.pm.
 $sql: an SQL query string.
 $vars: optional reference to an array of variable values, 
 required if $sql contains '?'s which need to be replaced 
 by the corresponding variable values upon execution, see DBI.pm for details.
-If $sql is an INSERT and contain an auto-increment field, 
-$Table::ID will contain the returned auto-increment value. 
-Although we don't encourage using fromSQL for INSERT (it's not supposed
-to return a table), $Table::ID is supplied for completeness and the authors'
-laziness (using fromSQL for INSERT does save us the trouble of writing
-prepare() and finish()); Hint: in MySQL, Table::fromSQL($dbh, 'show tables from test') will also create a valid table object.
+Hint: in MySQL, Table::fromSQL($dbh, 'show tables from test') will also create a valid table object.
 
 =back
 

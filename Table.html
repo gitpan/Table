@@ -147,6 +147,10 @@ HREF="http://www.geocities.com/easydatabase">http://www.geocities.com/easydataba
 
 
 <P>
+We use Table instead of Table, because Table.pm has already been used
+inside PerlQt module in CPAN.
+
+<P>
 <HR>
 <H1><A NAME="INTRODUCTION">INTRODUCTION</A></H1>
 <P>
@@ -230,9 +234,8 @@ contains all column names.
 <P>
 see table::match_string and table::match_pattern
 
-<DT><STRONG><A NAME="item__Table_ID">$Table::ID</A></STRONG><DD>
 <P>
-see Table::fromSQL
+# =item $Table::ID # #see Table::fromSQL
 
 </DL>
 <P>
@@ -302,20 +305,14 @@ column names, If it is set to 0, the default column names are ``col1'',
 <DT><STRONG>table Table::fromSQL ($dbh, $sql, $vars)</STRONG><DD>
 <P>
 create a table from the result of an SQL selection query. It returns a
-table object upon success or undef otherwise. Side effect: update
-$Table::ID. $dbh: a valid database handler. Typically <CODE>$dbh</CODE> is
-obtained from DBI-&gt;connect, see ``Interface to Database'' or DBI.pm.
-$sql: an SQL query string. $vars: optional reference to an array of
-variable values, required if <CODE>$sql</CODE> contains '?'s which need to
-be replaced by the corresponding variable values upon execution, see DBI.pm
-for details. If <CODE>$sql</CODE> is an INSERT and contain an
-auto-increment field, $Table::ID will contain the returned auto-increment
-value. Although we don't encourage using fromSQL for INSERT (it's not
-supposed to return a table), $Table::ID is supplied for completeness and
-the authors' laziness (using fromSQL for INSERT does save us the trouble of
-writing <CODE>prepare()</CODE> and <CODE>finish());</CODE> Hint: in MySQL,
-Table::fromSQL($dbh, 'show tables from test') will also create a valid
-table object.
+table object upon success or undef otherwise. $dbh: a valid database
+handler. Typically <CODE>$dbh</CODE> is obtained from DBI-&gt;connect, see
+``Interface to Database'' or DBI.pm. $sql: an SQL query string. $vars:
+optional reference to an array of variable values, required if
+<CODE>$sql</CODE> contains '?'s which need to be replaced by the
+corresponding variable values upon execution, see DBI.pm for details. Hint:
+in MySQL, Table::fromSQL($dbh, 'show tables from test') will also create a
+valid table object.
 
 </DL>
 <P>
