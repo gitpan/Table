@@ -23,12 +23,14 @@ typedef struct Command {
                                  * (usually the same as clientData). */
 } Command;
 
-COREXT int              Tk_TableCmd _ANSI_ARGS_((ClientData clientData,
+EXTERN int              Tk_TableCmd _ANSI_ARGS_((ClientData clientData,
                             Tcl_Interp *interp, int argc, Arg *args));
  
 DECLARE_VTABLES;
  
 MODULE = Tk::BLT::Table       PACKAGE = Tk::BLT::Table
+
+PROTOTYPES: DISABLE
  
 BOOT:
  {

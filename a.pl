@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl
-BEGIN { unshift (@INC,qw(./blib .)) }
+BEGIN { unshift (@INC,qw(./blib/lib ./blib/arch ./blib .)) }
 use Tk;
 use Tk::BLT::Table;
 #

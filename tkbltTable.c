@@ -523,7 +523,7 @@ static Tk_ConfigSpec TableconfigSpecs[] = {
  * Forward declarations
  */
 static void ArrangeTable _ANSI_ARGS_((ClientData clientData));
-static void DestroyTable _ANSI_ARGS_((ClientData clientData));
+static void DestroyTable _ANSI_ARGS_((char * clientData));
 static void DestroyCubicle _ANSI_ARGS_((Cubicle *cubiPtr));
 static void TableEventProc _ANSI_ARGS_((ClientData clientData,
 	XEvent *eventPtr));
@@ -535,7 +535,7 @@ static int NumEntries _ANSI_ARGS_((Table *table, PartitionTypes type));
 extern int strcasecmp _ANSI_ARGS_((CONST char *s1, CONST char *s2));
 
 static void DestroyTable(clientData)
-    ClientData clientData;
+    char * clientData;
 {
 }
 /*
@@ -809,7 +809,7 @@ ParseLeftTop(clientData, interp, tkwin, value, widgRec, offset)
     int offset;			/* Offset of table in record */
 {
     Table ***topPtr = (Table ***)(widgRec + offset);
-    Table *tablePtr;
+    Table *tablePtr = NULL;
     Tcl_HashEntry *entryPtr;
     Tcl_HashSearch cursor;
     int numElem;
@@ -1040,9 +1040,9 @@ TableEventProc(clientData, eventPtr)
 	Blt_ClearList(&(tablePtr->colSorted));
 
 	if (tablePtr->flags & REDRAW_PENDING) {
-	    Tk_CancelIdleCall(ArrangeTable, (ClientData)tablePtr);
+	    Tcl_CancelIdleCall(ArrangeTable, (ClientData)tablePtr);
 	}
-	Tk_EventuallyFree((ClientData)tablePtr, DestroyTable);
+	Tcl_EventuallyFree((ClientData)tablePtr, DestroyTable);
     }
 }
 
@@ -1329,7 +1329,7 @@ DestroyCubicle(cubiPtr)
 	cubiPtr->tablePtr->flags |= REQUEST_LAYOUT|RSLBL;
 	if (!(cubiPtr->tablePtr->flags & REDRAW_PENDING)) {
 	    cubiPtr->tablePtr->flags |= REDRAW_PENDING;
-	    Tk_DoWhenIdle(ArrangeTable, (ClientData)cubiPtr->tablePtr);
+	    Tcl_DoWhenIdle(ArrangeTable, (ClientData)cubiPtr->tablePtr);
 	}
     }
 
@@ -1614,7 +1614,7 @@ Tk_TableCmd(clientData, interp, argc, args)
  *
  * DestroyTable --
  *
- *	This procedure is invoked by Tk_EventuallyFree or Tk_Release
+ *	This procedure is invoked by Tk_EventuallyFree or Tcl_Release
  *	to clean up the Table structure at a safe time (when no-one is
  *	using it anymore).
  *
@@ -2169,10 +2169,10 @@ ManageWindows(tablePtr, interp, argc, args)
     Arg *args;		/* List of slave windows, indices, and
 				 * options */
 {
-    char *savePtr;
     int row, column;
     register int i, count;
     Tk_Window tkwin;
+    char *savePtr = NULL;
 
     for (i = 0; i < argc; /*empty*/ ) {
 	tkwin = Tk_NameToWindow(interp, LangString(args[i]), tablePtr->tkwin);
@@ -3166,6 +3166,7 @@ ArrangeCubicles(tablePtr)
     Tk_Window parent, ancestor;
     int maxX, maxY;
     int screenX1, screenX2, screenY1, screenY2;
+    screenX1 = screenX2 = screenY1 = screenY2 = 0;
 
     maxX = tablePtr->width - tablePtr->inset;
     maxY = tablePtr->height - tablePtr->inset;
@@ -3349,7 +3350,7 @@ TableUpdateScrollbars(tablePtr)
 	}
 	result = LangDoCallback(tablePtr->interp, tablePtr->xScrollCmd , 0, 2, " %g %g", f1, f2);
 	if (result != TCL_OK) {
-	    Tk_BackgroundError(tablePtr->interp);
+	    Tcl_BackgroundError(tablePtr->interp);
 	}
 	Tcl_ResetResult(tablePtr->interp);
     }
@@ -3371,7 +3372,7 @@ TableUpdateScrollbars(tablePtr)
 	}
 	result = LangDoCallback(tablePtr->interp, tablePtr->yScrollCmd , 0, 2, " %g %g", f1, f2);
 	if (result != TCL_OK) {
-	    Tk_BackgroundError(tablePtr->interp);
+	    Tcl_BackgroundError(tablePtr->interp);
 	}
 	Tcl_ResetResult(tablePtr->interp);
     }
@@ -3451,7 +3452,7 @@ ArrangeTable(clientData)
     int twiceBW;
     int requete;
 
-    Tk_Preserve((ClientData)tablePtr);
+    Tcl_Preserve((ClientData)tablePtr);
     /*
      * If the table has no children anymore, then don't do anything at
      * all: just leave the master window's size as-is.
@@ -3459,7 +3460,7 @@ ArrangeTable(clientData)
 
     if ((Blt_GetListLength(tablePtr->listPtr) == 0) ||
 	(tablePtr->tkwin == NULL)) {
-	Tk_Release((ClientData)tablePtr);
+	Tcl_Release((ClientData)tablePtr);
 	return;
     }
     if (tablePtr->flags & REQUEST_LAYOUT) {
@@ -3521,9 +3522,9 @@ ArrangeTable(clientData)
 	  tablePtr->redrawY1 = 0;
 	  tablePtr->redrawX2 = reqwidth;
 	  tablePtr->redrawY2 = reqheight;
-	  Tk_DoWhenIdle(ArrangeTable, (ClientData) tablePtr);
+	  Tcl_DoWhenIdle(ArrangeTable, (ClientData) tablePtr);
 	  ForcePartitions(tablePtr);
-	  Tk_Release((ClientData)tablePtr);
+	  Tcl_Release((ClientData)tablePtr);
 	  return;
 	}
     }
@@ -3537,7 +3538,7 @@ ArrangeTable(clientData)
 
     if (!Tk_IsMapped(tablePtr->tkwin)) {
 	tablePtr->flags &= ~(RSLBL|REDRAW_PENDING);
-	Tk_Release((ClientData)tablePtr);
+	Tcl_Release((ClientData)tablePtr);
 	return;
     }
     /*
@@ -3663,7 +3664,7 @@ ArrangeTable(clientData)
     }
     tablePtr->flags &= ~(REDRAW_PENDING|RSLBL);
     ForcePartitions(tablePtr);
-    Tk_Release((ClientData)tablePtr);
+    Tcl_Release((ClientData)tablePtr);
 }
 
 /*
@@ -3687,7 +3688,7 @@ LocationInfo(tablePtr, interp, type, indexStr)
     Table *tablePtr;
     Tcl_Interp *interp;
     PartitionTypes type;
-    Arg *indexStr;
+    Arg indexStr;
 {
     long sum = 0;
     long index;
@@ -3897,7 +3898,7 @@ Tk_TableEventuallyRedraw(tablePtr, x1, y1, x2, y2)
 	tablePtr->redrawY1 = y1;
 	tablePtr->redrawX2 = x2;
 	tablePtr->redrawY2 = y2;
-	Tk_DoWhenIdle(ArrangeTable, (ClientData) tablePtr);
+	Tcl_DoWhenIdle(ArrangeTable, (ClientData) tablePtr);
 	tablePtr->flags |= REDRAW_PENDING;
     }
     ForcePartitions(tablePtr);
